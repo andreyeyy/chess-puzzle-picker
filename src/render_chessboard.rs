@@ -3,9 +3,9 @@ use image::{RgbaImage, Rgba, ImageBuffer, ImageFormat};
 use ab_glyph::{FontRef, PxScale};
 use imageproc::drawing::draw_text_mut;
 
-use crate::board::Board;
-use crate::square::Square;
-use crate::square::Piece;
+use crate::Board;
+use crate::Square;
+use crate::Piece;
 use crate::indexing::*;
 
 const WP: &[u8] = include_bytes!("../assets/chess-pieces/150x150/wp-150x150.png");

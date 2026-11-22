@@ -1,6 +1,8 @@
 use crate::Serializable;
 use crate::Error;
-use crate::square::Square;
+use crate::Square;
+use crate::Piece;
+use crate::Move;
 use crate::indexing;
 
 #[derive(Debug)]
@@ -54,6 +56,128 @@ impl Board {
                 white_to_move,
             }
         )
+    }
+
+    /// Changes the position on the board by moving a piece
+    pub fn apply_move(&mut self, mv: &Move) -> Result<(), Error> {
+        // Account for:
+        //
+        // Castling
+        // En passant
+        // Promotions
+
+        let from_square = self.squares[mv.from_square as usize].clone();
+        let to_square = self.squares[mv.to_square as usize].clone();
+
+        let (from_rank, from_file) = indexing::position_from_index(mv.from_square).unwrap();
+        let (to_rank, to_file) = indexing::position_from_index(mv.to_square).unwrap();
+
+        let piece_type = from_square.piece_type().ok_or(Error::InvalidMove)?;
+
+        match piece_type {
+            Piece::Pawn => {
+                // En passant
+                if from_file != to_file && to_square.is_empty() {
+                    let taken_pawn_rank: u8 = if self.white_to_move {5} else {2}; // zero-based rank
+                    let taken_pawn_file = to_file;
+
+                    let taken_pawn_index = indexing::index_from_position(taken_pawn_rank, taken_pawn_file).unwrap();
+
+                    // let taken_pawn_square = &self.squares[taken_pawn_index as usize];
+
+                    // Validate en passant
+                    // match taken_pawn_square.piece_type() {
+                    //     // En passant is impossible without the taken pawn present
+                    //     None => return Err(Error::InvalidMove), 
+                    //     Some(piece) => match piece {
+                    //         Piece::Pawn => {/* Ok, valid en passant */},
+                    //         _ => {
+                    //             dbg!("Invalid en passant");
+                    //             return Err(Error::InvalidMove);
+                    //         }
+                    //     }
+                    // }
+
+                    self.squares[mv.to_square as usize] =
+                        if self.white_to_move {Square::White(Piece::Pawn)}
+                        else {Square::Black(Piece::Pawn)};
+
+                    self.squares[mv.from_square as usize] = Square::Empty;
+                    self.squares[taken_pawn_index as usize] = Square::Empty;
+                    self.white_to_move = !self.white_to_move;
+                    return Ok(());
+                }
+
+
+                // Promotion
+                else if (self.white_to_move && from_rank == 6) ||
+                    (!self.white_to_move && from_rank == 1) {
+
+                    match &mv.promotion {
+                        None => {
+                            dbg!("Invalid promotion");
+                            return Err(Error::InvalidMove);
+                        }
+                        Some(promotion) => {
+                            self.squares[mv.from_square as usize] = Square::Empty;
+                            self.squares[mv.to_square as usize] = promotion.to_square(self.white_to_move);
+                            self.white_to_move = !self.white_to_move;
+                            return Ok(());
+                        }
+                    }
+                }
+            },
+            Piece::King => {
+                // Castling
+                if from_file == 4 && (to_file == 2 || to_file == 6) {
+
+                    let rook_from_file: u8;
+                    let rook_to_file: u8;
+                    if to_file == 2 {
+                        rook_from_file = 0; // rook from a1
+                        rook_to_file = 3; // to d1
+                    }
+                    else if to_file == 6 {
+                        rook_from_file = 7; // rook from a1
+                        rook_to_file = 5; // to f1
+                    }
+                    else {panic!()}
+
+                    let rook_from_rank = from_rank; // rook is on the same rank as king when castling
+                    let rook_to_rank = rook_from_rank;
+
+                    let rook_from_index = indexing::index_from_position(rook_from_rank, rook_from_file).unwrap();
+                    let rook_to_index = indexing::index_from_position(rook_to_rank, rook_to_file).unwrap();
+
+                    
+                    // Remove king from original position
+                    self.squares[mv.from_square as usize] = Square::Empty;
+
+                    // Remove rook from original position
+                    self.squares[rook_from_index as usize] = Square::Empty;
+
+                    // Place rook at new position
+                    self.squares[rook_to_index as usize] = 
+                        if self.white_to_move {Square::White(Piece::Rook)}
+                        else {Square::Black(Piece::Rook)};
+
+                    // Place king at new position
+                    self.squares[mv.to_square as usize] = from_square;
+
+                    self.white_to_move = !self.white_to_move;
+                    return Ok(());
+                }
+            },
+            _ => {},
+        }
+
+        // Base case
+        self.squares[mv.from_square as usize] = Square::Empty;
+        self.squares[mv.to_square as usize] = from_square;
+        self.white_to_move = !self.white_to_move;
+
+        Ok(())
+
     }
 }
 

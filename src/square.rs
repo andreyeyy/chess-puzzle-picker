@@ -1,7 +1,7 @@
 use crate::Error;
 use crate::Serializable;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Piece {
     Pawn,
     Knight,
@@ -11,7 +11,7 @@ pub enum Piece {
     King,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Square {
     Empty,
     White(Piece),
@@ -19,6 +19,21 @@ pub enum Square {
 }
 
 impl Square {
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Self::Empty => true,
+            _ => false,
+        }
+    }
+
+    pub fn piece_type(&self) -> Option<&Piece> {
+        match self {
+            Self::Empty => None,
+            Self::White(p) | Self::Black(p) => Some(p),
+        }
+    }
+
     fn to_byte(&self) -> u8 {
         match self {
             Square::Empty => b'.',
