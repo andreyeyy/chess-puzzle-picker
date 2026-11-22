@@ -8,3 +8,10 @@ indicatif = "0.18.6"
 rand = "0.10.4"
 reqwest = { version = "0.13.5", features = ["blocking"]}
 zstd = "0.14.4"
+image = { version = "0.25", optional = true }
+imageproc = { version = "0.27", optional = true }
+ab_glyph = { version = "0.2.32", optional = true }
+
+
+[features]
+image = ["dep:image", "dep:imageproc", "dep:ab_glyph"]

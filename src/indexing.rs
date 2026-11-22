@@ -18,6 +18,16 @@ pub fn position_from_index(index: u8) -> Result<(u8, u8), Error> {
     )
 }
 
+pub fn invert_coordinate(coordinate: u8) -> Result<u8, Error> {
+    if coordinate >= 8 {
+        return Err(Error::IndexOutOfBounds(coordinate));
+    }
+    else {
+        Ok(7 - coordinate)
+    }
+
+}
+
 pub fn index_from_ascii(square: &[u8]) -> Result<u8, Error> {
     if square.len() != 2 {
         return Err(Error::InvalidStringLength(square.len()));
