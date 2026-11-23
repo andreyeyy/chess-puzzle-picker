@@ -58,6 +58,7 @@ impl Puzzle {
     }
 
     /// Finds the puzzle with the specified ID in the .csv database. Not efficient, 
+    /// for debugging purposes only
     pub fn from_csv(path: &Path, id: &str)-> Result<Self, Box<dyn std::error::Error>> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);

@@ -26,6 +26,8 @@ fn progress_bar(total_size: Option<u64>) -> ProgressBar {
 }
 
 
+/// Struct for downloading, transforming and saving the lichess puzzle
+/// database for efficient puzzle retrieval
 pub struct PuzzleDatabase {
     // indexes_of_ratings[i] is the index at which i*INDEXES_DELTA-rated games start
     indexes_of_ratings: [u64; INDEXES_NUM],
@@ -34,7 +36,8 @@ pub struct PuzzleDatabase {
 
 impl PuzzleDatabase {
 
-    /// Downloads and formats the puzzle database, saving the .bin file to 'to'
+    /// Downloads and formats the puzzle database, saving the .bin file
+    /// to the specified location
     pub fn build(to: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let csv_path = to.with_file_name("lichess_db_puzzle.csv.zst");
 
