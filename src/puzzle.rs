@@ -1,7 +1,19 @@
 use std::path::Path;
 use std::io::{BufReader, BufRead};
 use std::fs::File;
-use crate::{Error, Serializable, Board, Move};
+use crate::{Error, Serializable, Board, Move, indexing};
+
+#[derive(Debug)]
+pub enum ValidationResult {
+    /// The answer provided by the user is a correct solution, they solved the puzzle.
+    CorrectSolution,
+
+    /// The answer provided by the user is wrong, they did not solve the puzzle.
+    WrongSolution,
+
+    /// The answer provided is invalid, meaning it cannot possibly be an answer to any puzzle.
+    InvalidSolution,
+}
 
 #[derive(Debug)]
 pub struct Puzzle {
@@ -12,13 +24,40 @@ pub struct Puzzle {
 
 impl Puzzle {
 
-    /// Returns true if the given solution is correct, false otherwise
-    pub fn validate_solution(&self, solution: &str) -> bool {
+    /// Checks whether a string is the solution to the puzzle
+    pub fn validate_solution(&self, solution: &str) -> ValidationResult {
+        if !solution.is_ascii() {
+            return ValidationResult::InvalidSolution;
+        }
 
-        let solution_lowercase = solution.to_lowercase();
-        let solution_lowercase = solution_lowercase.trim();
+        let normalized = solution.trim().to_ascii_lowercase();
+        let bytes = normalized.as_bytes();
 
-        return solution_lowercase == self.solution.to_string();
+        if bytes.len() != 4 && bytes.len() != 5 {
+            return ValidationResult::InvalidSolution;
+        }
+
+        // Validating origin square
+        if indexing::index_from_ascii(&bytes[0..2]).is_err() {
+            return ValidationResult::InvalidSolution;
+        }
+
+        // Validating destination square
+        if indexing::index_from_ascii(&bytes[2..4]).is_err() {
+            return ValidationResult::InvalidSolution;
+        }
+
+        // Validating promotion character
+        if bytes.len() == 5 && !matches!(bytes[4], b'q' | b'r' | b'n' | b'b') {
+            return ValidationResult::InvalidSolution;
+        }
+
+        // Checking answer
+        if normalized == self.solution.to_string() {
+            ValidationResult::CorrectSolution
+        } else {
+            ValidationResult::WrongSolution
+        }
     }
 
     /// Takes a line in the .csv database, turns it into Puzzle
