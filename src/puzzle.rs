@@ -11,6 +11,16 @@ pub struct Puzzle {
 }
 
 impl Puzzle {
+
+    /// Returns true if the given solution is correct, false otherwise
+    pub fn validate_solution(&self, solution: &str) -> bool {
+
+        let solution_lowercase = solution.to_lowercase();
+        let solution_lowercase = solution_lowercase.trim();
+
+        return solution_lowercase == self.solution.to_string();
+    }
+
     /// Takes a line in the .csv database, turns it into Puzzle
     pub fn from_str(line: &str) -> Result<Self, Error> {
         let mut chars_iter = line.chars();

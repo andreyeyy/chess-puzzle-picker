@@ -83,21 +83,6 @@ impl Board {
 
                     let taken_pawn_index = indexing::index_from_position(taken_pawn_rank, taken_pawn_file).unwrap();
 
-                    // let taken_pawn_square = &self.squares[taken_pawn_index as usize];
-
-                    // Validate en passant
-                    // match taken_pawn_square.piece_type() {
-                    //     // En passant is impossible without the taken pawn present
-                    //     None => return Err(Error::InvalidMove), 
-                    //     Some(piece) => match piece {
-                    //         Piece::Pawn => {/* Ok, valid en passant */},
-                    //         _ => {
-                    //             dbg!("Invalid en passant");
-                    //             return Err(Error::InvalidMove);
-                    //         }
-                    //     }
-                    // }
-
                     self.squares[mv.to_square as usize] =
                         if self.white_to_move {Square::White(Piece::Pawn)}
                         else {Square::Black(Piece::Pawn)};
@@ -114,10 +99,7 @@ impl Board {
                     (!self.white_to_move && from_rank == 1) {
 
                     match &mv.promotion {
-                        None => {
-                            dbg!("Invalid promotion");
-                            return Err(Error::InvalidMove);
-                        }
+                        None => return Err(Error::InvalidMove), // invalid promotion
                         Some(promotion) => {
                             self.squares[mv.from_square as usize] = Square::Empty;
                             self.squares[mv.to_square as usize] = promotion.to_square(self.white_to_move);

@@ -114,6 +114,26 @@ impl Move {
             promotion,
         })
     }
+
+    pub fn from_rank(&self) -> u8 {
+        let (from_rank, _from_file) = indexing::position_from_index(self.from_square).unwrap();
+        from_rank
+    }
+
+    pub fn from_file(&self) -> u8 {
+        let (_from_rank, from_file) = indexing::position_from_index(self.from_square).unwrap();
+        from_file
+    }
+
+    pub fn to_rank(&self) -> u8 {
+        let (to_rank, _to_file) = indexing::position_from_index(self.to_square).unwrap();
+        to_rank
+    }
+
+    pub fn to_file(&self) -> u8 {
+        let (_to_rank, to_file) = indexing::position_from_index(self.to_square).unwrap();
+        to_file
+    }
 }
 
 impl Serializable for Move {
