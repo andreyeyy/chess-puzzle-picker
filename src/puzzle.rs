@@ -62,40 +62,19 @@ impl Puzzle {
 
     /// Takes a line in the .csv database, turns it into Puzzle
     pub fn from_str(line: &str) -> Result<Self, Error> {
-        let mut chars_iter = line.chars();
-        let mut fen_raw = String::new();
-        let mut last_move_raw = String::new();
-        let mut solution_raw = String::new();
-        let mut rating_raw = String::new();
+        //PuzzleId,FEN,Moves,Rating,RatingDeviation,Popularity,NbPlays,Themes,GameUrl,OpeningTags,DailyDate
+        let fields: Vec<&str> = line.split(',').collect();
 
-        chars_iter.find(|&c| c == ',');
+        let fen_raw = fields[1];
+        let mut moves = fields[2].split_whitespace();
+        let last_move_raw = moves.next().ok_or(Error::InvalidCsvRow(line.to_string()))?;
+        let solution_raw = moves.next().ok_or(Error::InvalidCsvRow(line.to_string()))?;
+        let rating_raw = fields[3];
 
-        for c in chars_iter.by_ref() {
-            if c == ',' {break;}
-            fen_raw.push(c);
-        }
-
-        for c in chars_iter.by_ref() {
-            if c == ' ' {break;}
-            last_move_raw.push(c);
-        }
-
-        for c in chars_iter.by_ref() {
-            if c == ' ' || c == ',' {break;}
-            solution_raw.push(c);
-        }
-
-        chars_iter.find(|&c| c == ',');
-
-        for c in chars_iter.by_ref() {
-            if c == ',' {break;}
-            rating_raw.push(c);
-        }
-
-        let rating: u16 = rating_raw.parse().expect("Valid rating");
-        let last_move = Move::from_str(&last_move_raw.into_bytes()).expect("Valid move");
-        let solution = Move::from_str(&solution_raw.into_bytes()).expect("Valid solution");
-        let mut board = Board::parse_fen(&fen_raw).unwrap();
+        let rating: u16 = rating_raw.parse().map_err(|_| Error::InvalidCsvRow(line.to_string()))?;
+        let last_move = Move::from_str(&last_move_raw.as_bytes())?;
+        let solution = Move::from_str(&solution_raw.as_bytes())?;
+        let mut board = Board::parse_fen(fen_raw).unwrap();
 
         board.apply_move(&last_move)?;
 

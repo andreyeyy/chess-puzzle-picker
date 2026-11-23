@@ -108,6 +108,7 @@ pub enum Error {
     InvalidPosition((u8, u8)),
     IndexOutOfBounds(u8),
     InvalidFen(String),
+    InvalidCsvRow(String),
     FileReadError,
     FileWriteError,
     DeserializationError,
