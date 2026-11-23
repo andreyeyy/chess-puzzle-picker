@@ -1,8 +1,6 @@
-use crate::Error;
-use crate::Serializable;
-use crate::indexing::*;
-use crate::Square;
-use crate::Piece;
+use std::fmt;
+
+use crate::{Error, Serializable, indexing, Square, Piece};
 
 #[derive(Debug)]
 pub enum Promotion {
@@ -40,6 +38,17 @@ impl Promotion {
     }
 }
 
+impl fmt::Display for Promotion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", match self {
+            Self::Queen => "q",
+            Self::Rook=> "r",
+            Self::Knight=> "n",
+            Self::Bishop=> "b",
+        })
+    }
+}
+
 impl Serializable for Promotion {
 
     fn serialize(&self) -> Vec<u8> {
@@ -63,6 +72,27 @@ pub struct Move {
     pub promotion: Option<Promotion>,
 }
 
+impl fmt::Display for Move {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+
+        let (from_rank, from_file) = indexing::position_from_index(self.from_square).unwrap();
+        let (to_rank, to_file) = indexing::position_from_index(self.to_square).unwrap();
+
+        let from_file_str = indexing::file_to_ascii(from_file).unwrap() as char;
+        let from_rank_str = indexing::rank_to_ascii(from_rank).unwrap() as char;
+
+        let to_file_str = indexing::file_to_ascii(to_file).unwrap() as char;
+        let to_rank_str = indexing::rank_to_ascii(to_rank).unwrap() as char;
+
+        let promotion_str = match &self.promotion {
+            None => "".to_string(),
+            Some(p) => p.to_string(),
+        };
+
+        write!(f, "{from_file_str}{from_rank_str}{to_file_str}{to_rank_str}{promotion_str}")
+    }
+}
+
 impl Move {
 
     pub fn from_str(squares: &[u8]) -> Result<Self, Error> {
@@ -79,8 +109,8 @@ impl Move {
         }
 
         Ok(Move {
-            from_square: index_from_ascii(&squares[0..2])?,
-            to_square: index_from_ascii(&squares[2..4])?,
+            from_square: indexing::index_from_ascii(&squares[0..2])?,
+            to_square: indexing::index_from_ascii(&squares[2..4])?,
             promotion,
         })
     }

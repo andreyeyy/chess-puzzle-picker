@@ -49,3 +49,18 @@ pub fn index_from_ascii(square: &[u8]) -> Result<u8, Error> {
 
     return index_from_position(rank, file);
 }
+
+pub fn rank_to_ascii(rank: u8) -> Result<u8, Error> {
+    if rank >= 8 {
+        return Err(Error::IndexOutOfBounds(rank));
+    }
+    Ok(b'1' + rank)
+}
+
+pub fn file_to_ascii(file: u8) -> Result<u8, Error> {
+    if file >= 8 {
+        return Err(Error::IndexOutOfBounds(file));
+    }
+    Ok(b'a' + file)
+}
+
