@@ -70,7 +70,7 @@ impl Board {
         let to_square = self.squares[mv.to_square as usize].clone();
 
         let (from_rank, from_file) = indexing::position_from_index(mv.from_square).unwrap();
-        let (to_rank, to_file) = indexing::position_from_index(mv.to_square).unwrap();
+        let (_to_rank, to_file) = indexing::position_from_index(mv.to_square).unwrap();
 
         let piece_type = from_square.piece_type().ok_or(Error::InvalidMove)?;
 

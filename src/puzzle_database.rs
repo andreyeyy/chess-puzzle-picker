@@ -2,7 +2,7 @@ use std::path::Path;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, BufRead, Read, BufWriter, Write, Seek, SeekFrom};
-use crate::{Error, Serializable, Board, Move, Puzzle, INDEXES_NUM, INDEXES_DELTA};
+use crate::{Error, Serializable, Puzzle, INDEXES_NUM, INDEXES_DELTA};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 
 fn progress_bar(total_size: Option<u64>) -> ProgressBar {

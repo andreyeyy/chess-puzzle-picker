@@ -1,5 +1,5 @@
 use std::io::Cursor;
-use image::{RgbaImage, Rgba, ImageBuffer, ImageFormat};
+use image::{RgbaImage, Rgba, ImageBuffer};
 use ab_glyph::{FontRef, PxScale};
 use imageproc::drawing::draw_text_mut;
 

@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::io::{BufReader, BufRead, Read, BufWriter, Write, Seek, SeekFrom};
+use std::io::{BufReader, BufRead};
 use std::fs::File;
 use crate::{Error, Serializable, Board, Move};
 
@@ -48,7 +48,7 @@ impl Puzzle {
         let solution = Move::from_str(&solution_raw.into_bytes()).expect("Valid solution");
         let mut board = Board::parse_fen(&fen_raw).unwrap();
 
-        board.apply_move(&last_move);
+        board.apply_move(&last_move)?;
 
         Ok(Puzzle {
             rating,
