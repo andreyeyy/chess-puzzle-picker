@@ -2,6 +2,9 @@
 name = "chess-puzzle-picker"
 version = "0.1.0"
 edition = "2024"
+description = "Crate for efficient access to chess puzzles from the lichess puzzle database."
+license = "MIT"
+repository = "https://github.com/andreyeyy/chess-puzzle-picker"
 
 [dependencies]
 indicatif = "0.18.6"
