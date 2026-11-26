@@ -27,18 +27,19 @@ fn main() {
     let path_to_db = Path::new("/path/to/db.bin");
 
     let db = PuzzleDatabase::from_csv(&path_to_csv).unwrap();
-    db.write_to_file(&path_to_db);
+    db.write_to_file(&path_to_db).unwrap();
 }
 ```
 
 ## Getting a random puzzle
 ```rust
 use std::path::Path;
+use chess_puzzle_picker::RatingRange;
 use chess_puzzle_picker::PuzzleDatabase;
 
 fn main() {
     let path_to_db = Path::new("/path/to/db.bin");
-    let rating_range = (1700, 2500);
+    let rating_range = RatingRange::new(1700, 2200);
 
     let puzzle = PuzzleDatabase::get_random_puzzle(&path_to_db, rating_range).unwrap();
 }
@@ -50,19 +51,22 @@ This requires the "image" feature to be enabled
 use std::path::Path;
 use std::io::Write;
 
+use chess_puzzle_picker::RatingRange;
 use chess_puzzle_picker::PuzzleDatabase;
 use chess_puzzle_picker::render_chessboard::*;
 
 fn main() {
     let path_to_db = Path::new("/path/to/db.bin");
 
-    let rating_range = (1700, 2200);
+    let rating_range = RatingRange::new(1700, 2200);
     let puzzle = PuzzleDatabase::get_random_puzzle(path_to_db, rating_range).unwrap();
 
     let style = BoardStyle::default();
     let bytes = render_chessboard(&puzzle.board, style).unwrap();
 
     let mut file = std::fs::File::create("/path/to/puzzle.png").unwrap();
-    file.write_all(&bytes);
+    file.write_all(&bytes).unwrap();
 }
 ```
+
+
