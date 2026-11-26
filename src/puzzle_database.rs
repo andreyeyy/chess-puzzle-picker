@@ -2,7 +2,7 @@ use std::path::Path;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, BufRead, Read, BufWriter, Write, Seek, SeekFrom};
-use crate::{Serializable, Puzzle, INDEXES_NUM, INDEXES_DELTA};
+use crate::{Serializable, Puzzle};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 
 
@@ -25,35 +25,6 @@ fn progress_bar(total_size: Option<u64>) -> ProgressBar {
 
     pb
 }
-
-#[derive(Clone)]
-pub struct RatingRange {
-    min: u16,
-    max: u16,
-}
-
-impl RatingRange {
-    pub fn new(min: u16, max: u16) -> Result<Self, ()> {
-        if max < min {
-            Err(())
-        }
-        else {
-            Ok(RatingRange {min, max})
-        }
-    }
-    fn indexes(&mut self) -> (usize, usize){
-
-        if self.max > INDEXES_NUM as u16 * INDEXES_DELTA {
-            self.max = INDEXES_NUM as u16 * INDEXES_DELTA;
-        }
-
-        let min_index = self.min / INDEXES_DELTA;
-        let max_index = self.max / INDEXES_DELTA;
-
-        (min_index as usize, max_index as usize)
-    }
-}
-
 
 #[derive(Debug)]
 pub enum DownloadError {
@@ -87,7 +58,6 @@ pub enum PuzzleRetrievalError {
 /// database for efficient puzzle retrieval
 pub struct PuzzleDatabase {
     // indexes_of_ratings[i] is the index at which i*INDEXES_DELTA-rated games start
-    indexes_of_ratings: [u64; INDEXES_NUM],
     puzzles: Vec<Puzzle>,
 }
 
@@ -110,37 +80,105 @@ impl PuzzleDatabase {
         Ok(())
     }
 
-    /// Selects and returns a random puzzle from the .bin database for a specific rating range.
-    pub fn get_random_puzzle(path: &Path, rating_range: RatingRange) -> Result<Puzzle, PuzzleRetrievalError> {
-        let mut rating_range = rating_range.clone();
+    /// Selects and returns a random puzzle from the .bin database for a specific rating.
+    ///
+    /// The random sample consists of 'sample_size' puzzles closest to 'rating'.
+    ///
+    /// If 'sample_size' is larger than the number of puzzles in the database,
+    /// a random puzzle from the database is returned.
+    pub fn get_random_puzzle(path: &Path, rating: u16, sample_size: u64) -> Result<Puzzle, PuzzleRetrievalError> {
+        let half_sample_size = sample_size / 2;
 
-        let (min_index, max_index) = rating_range.indexes();
+        let total_puzzles = Self::total_puzzles(path).map_err(|e| PuzzleRetrievalError::IO(e))?;
+        
+        let min_index: u64; let max_index: u64;
 
-        let indexes = Self::retrieve_indexes(path).map_err(|e| PuzzleRetrievalError::IO(e))?;
+        if sample_size >= total_puzzles {
+            min_index = 0;
+            max_index = total_puzzles - 1;
+        }
+        else {
+            let center_index = Self::find_closest_index(path, rating)?;
 
-        let start_puzzle_index = indexes[min_index];
-        let end_puzzle_index = indexes[max_index];
+            if center_index + half_sample_size >= total_puzzles {
+                max_index = total_puzzles - 1;
+                min_index = max_index - sample_size;
+            }
+            else if center_index < half_sample_size {
+                min_index = 0;
+                max_index = sample_size - 1;
+            }
+            else {
+                min_index = center_index - half_sample_size;
+                max_index = center_index + half_sample_size;
+            }
+        }
 
-        let selected_index = rand::random_range(start_puzzle_index..end_puzzle_index);
+
+        let selected_index = rand::random_range(min_index..max_index);
 
         Self::get_puzzle(path, selected_index)
+    }
+
+    /// Returns the total number of puzzles in the database
+    pub fn total_puzzles(path: &Path) -> std::io::Result<u64> {
+        Ok (
+            std::fs::metadata(path)?.len() / Puzzle::size_in_memory() as u64
+        )
+    }
+
+    /// Performs binary search on the .bin database
+    fn find_closest_index(path: &Path, rating: u16) -> Result<u64, PuzzleRetrievalError> {
+
+        let mut file = File::open(path).map_err(|e| PuzzleRetrievalError::IO(e))?;
+
+        let db_size = file.metadata().map_err(|e| PuzzleRetrievalError::IO(e))?.len();
+
+        let total_indexes: u64 = db_size / Puzzle::size_in_memory() as u64;
+
+        let mut left: u64 = 0;
+        let mut right: u64 = total_indexes - 1;
+
+        let mut mid: u64 = 0;
+
+        while left <= right {
+            mid = left + (right - left) / 2;
+            if mid == 0 {return Ok(0);}
+
+            let puzzle = Self::get_puzzle_from_file(&mut file, mid)?;
+
+            if puzzle.rating == rating {
+                return Ok(mid);
+            }
+            else if puzzle.rating < rating {
+                left = mid + 1;
+            }
+            else {
+                right = mid - 1;
+            }
+        }
+
+        Ok(mid)
+    }
+
+
+    fn get_puzzle_from_file(f: &mut File, index: u64) -> Result<Puzzle, PuzzleRetrievalError> {
+        let mut puzzle_bytes: Vec<u8> = vec![0; Puzzle::size_in_memory()];
+
+        let byte_offset = index * Puzzle::size_in_memory() as u64;
+
+        f.seek(SeekFrom::Start(byte_offset)).map_err(|e| PuzzleRetrievalError::IO(e))?;
+        f.read_exact(&mut puzzle_bytes).map_err(|e| PuzzleRetrievalError::IO(e))?;
+
+        Puzzle::deserialize(&puzzle_bytes).map_err(|()| PuzzleRetrievalError::Deserialization)
     }
 
     /// Finds and retrieves the puzzle at 'index' from the .bin database
     pub fn get_puzzle(path: &Path, index: u64) -> Result<Puzzle, PuzzleRetrievalError> {
 
-        let byte_offset = index * Puzzle::size_in_memory() as u64 + INDEXES_NUM as u64 * 8;
-
         let mut file = File::open(path).map_err(|e| PuzzleRetrievalError::IO(e))?;
-        file.seek(SeekFrom::Start(byte_offset)).map_err(|e| PuzzleRetrievalError::IO(e))?;
 
-        let mut puzzle_bytes: Vec<u8> = vec![0; Puzzle::size_in_memory()];
-
-        file.read_exact(&mut puzzle_bytes).map_err(|e| PuzzleRetrievalError::IO(e))?;
-
-        let puzzle = Puzzle::deserialize(&puzzle_bytes).map_err(|()| PuzzleRetrievalError::Deserialization)?;
-
-        Ok(puzzle)
+        Self::get_puzzle_from_file(&mut file, index)
     }
 
 
@@ -150,7 +188,6 @@ impl PuzzleDatabase {
         let reader = BufReader::new(file);
 
         let mut puzzles: Vec<Puzzle> = Vec::new();
-        let mut indexes_of_ratings: [u64; INDEXES_NUM] = [0; INDEXES_NUM];
 
         let file_size: u64 = std::fs::metadata(path).map_err(|e| CsvParseError::IO(e))?.len();
         let mut progress: u64 = 0;
@@ -173,19 +210,7 @@ impl PuzzleDatabase {
         println!("Sorting puzzles");
         puzzles.sort_unstable_by_key(|puzzle| puzzle.rating);
 
-        println!("Finding indexes");
-        for i in 0..indexes_of_ratings.len() {
-            let rating = (i * INDEXES_DELTA as usize) as u16;
-            match puzzles.binary_search_by_key(&rating, |x| x.rating) {
-                Ok(index) => indexes_of_ratings[i] = index as u64,
-                Err(index) => indexes_of_ratings[i] = index as u64,
-            }
-        }
-
-        Ok(PuzzleDatabase {
-            indexes_of_ratings,
-            puzzles,
-        })
+        Ok(PuzzleDatabase {puzzles})
     }
 
     /// Serializes the puzzle database and writes to a file for future use
@@ -193,10 +218,6 @@ impl PuzzleDatabase {
         println!("Writing to {:?}", path);
         let file = File::create(path)?;
         let mut writer = BufWriter::new(file);
-
-        for i in self.indexes_of_ratings {
-            writer.write(&i.to_le_bytes())?;
-        }
 
         let total_size: u64 = (Puzzle::size_in_memory() * self.puzzles.len()) as u64;
         let mut progress: u64 = 0;
@@ -215,23 +236,6 @@ impl PuzzleDatabase {
         println!("Done!");
 
         Ok(())
-    }
-
-    /// Reads and returns indexes from the .bin file
-    pub fn retrieve_indexes(path: &Path) -> std::io::Result<[u64; INDEXES_NUM]> {
-        let file = File::open(path)?;
-        let mut reader = BufReader::new(file);
-
-        let mut bytes = [0u8; INDEXES_NUM * 8];
-        reader.read_exact(&mut bytes)?;
-
-        let mut indexes: [u64; INDEXES_NUM] = [0; INDEXES_NUM];
-
-        for (value, chunk) in indexes.iter_mut().zip(bytes.chunks_exact(8)) {
-            *value = u64::from_le_bytes(chunk.try_into().unwrap());
-        }
-
-        Ok(indexes)
     }
 
     /// Downloads the puzzle database from lichess.org in the .csv.zst format,

@@ -37,14 +37,12 @@
 //! ## Getting a random puzzle
 //! ```
 //! use std::path::Path;
-//! use chess_puzzle_picker::RatingRange;
 //! use chess_puzzle_picker::PuzzleDatabase;
 //!
 //! fn main() {
 //!     let path_to_db = Path::new("/path/to/db.bin");
-//!     let rating_range = RatingRange::new(1700, 2200).unwrap();
 //!
-//!     let puzzle = PuzzleDatabase::get_random_puzzle(&path_to_db, rating_range).unwrap();
+//!     let puzzle = PuzzleDatabase::get_random_puzzle(&path_to_db, 1700, 200_000).unwrap();
 //! }
 //! ```
 //!
@@ -54,15 +52,13 @@
 //! use std::path::Path;
 //! use std::io::Write;
 //!
-//! use chess_puzzle_picker::RatingRange;
 //! use chess_puzzle_picker::PuzzleDatabase;
 //! use chess_puzzle_picker::render_chessboard::*;
 //!
 //! fn main() {
 //!     let path_to_db = Path::new("/path/to/db.bin");
 //!
-//!     let rating_range = RatingRange::new(1700, 2200).unwrap();
-//!     let puzzle = PuzzleDatabase::get_random_puzzle(path_to_db, rating_range).unwrap();
+//!     let puzzle = PuzzleDatabase::get_random_puzzle(path_to_db, 1700, 200_000).unwrap();
 //!
 //!     let style = BoardStyle::default();
 //!     let bytes = render_chessboard(&puzzle.board, style).unwrap();
@@ -92,9 +88,6 @@ pub use board::*;
 pub use chess_move::*;
 pub use puzzle::*;
 pub use puzzle_database::*;
-
-pub const INDEXES_NUM: usize = 30;
-pub const INDEXES_DELTA: u16 = 100;
 
 /// Lets a type to be losslessly serialized and deserialized
 pub trait Serializable {
