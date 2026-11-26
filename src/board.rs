@@ -1,23 +1,23 @@
 use crate::Serializable;
-use crate::Error;
 use crate::Square;
-use crate::Piece;
+use crate::{Piece, PieceType};
 use crate::Move;
-use crate::indexing;
+
+use crate::{Rank, File};
 
 #[derive(Debug)]
 pub struct Board {
-    pub squares: [Square; 64],
+    pub squares: [Option<Piece>; 64],
     pub white_to_move: bool,
 }
 
 impl Board {
     /// Turns a &str in FEN notation, turns it into a Board
-    pub fn parse_fen(fen: &str) -> Result<Self, Error> {
-        let mut squares: [Square; 64] = [const {Square::Empty}; 64];
+    pub fn parse_fen(fen: &str) -> Result<Self, ()> {
+        let mut squares: [Option<Piece>; 64] = [None; 64];
         let white_to_move: bool;
 
-        let mut rank: u8 = 7;
+        let mut rank = Rank::Eight;
         let mut file: u8 = 0;
 
         let mut chars = fen.chars();
@@ -27,27 +27,40 @@ impl Board {
             if c == ' ' {
                 break;
             }
+
             if c.is_ascii_digit() {
-                file += c.to_digit(10).ok_or(Error::InvalidFen(fen.to_string()))? as u8;
+
+                let skip_files = c.to_digit(10).ok_or(())? as u8;
+                file += skip_files;
+
+                if file > 8 {
+                    return Err(());
+                }
+
                 continue;
             }
+
             if c == '/' {
                 rank -= 1;
                 file = 0;
                 continue;
             }
-            let index = indexing::index_from_position(rank, file)?;
-            if index as usize >= squares.len(){
-                return Err(Error::IndexOutOfBounds(index as u8));
+            let square = Square {file: File::try_from(file)?, rank};
+            let index = square.index() as usize;
+
+            if index >= squares.len(){
+                return Err(());
             }
-            squares[index as usize] = Square::from_char(c as u8)?;
+            let piece_char = c as u8;
+            squares[index] = Some(Piece::from_ascii(piece_char)?);
+
             file += 1;
         }
 
-        match chars.next().ok_or(Error::InvalidFen(fen.to_string()))? {
+        match chars.next().ok_or(())? {
             'w' => white_to_move = true,
             'b' => white_to_move = false,
-            _   =>  return Err(Error::InvalidFen(fen.to_string()))
+            _   =>  return Err(())
         }
 
         Ok(
@@ -58,93 +71,111 @@ impl Board {
         )
     }
 
-    /// Changes the position on the board by moving a piece
-    pub fn apply_move(&mut self, mv: &Move) -> Result<(), Error> {
+    /// Changes the position on the board by moving a piece. Does not verify move validity
+    pub fn apply_move(&mut self, mv: &Move) -> Result<(), ()> {
         // Account for:
         //
         // Castling
         // En passant
         // Promotions
+        
+        let Some(piece_moved) = self.squares[mv.from_square.index() as usize]
+        else {return Err(())};
 
-        let from_square = self.squares[mv.from_square as usize].clone();
-        let to_square = self.squares[mv.to_square as usize].clone();
-
-        let (from_rank, from_file) = indexing::position_from_index(mv.from_square).unwrap();
-        let (_to_rank, to_file) = indexing::position_from_index(mv.to_square).unwrap();
-
-        let piece_type = from_square.piece_type().ok_or(Error::InvalidMove)?;
-
-        match piece_type {
-            Piece::Pawn => {
+        match piece_moved.kind{
+            PieceType::Pawn => {
                 // En passant
-                if from_file != to_file && to_square.is_empty() {
-                    let taken_pawn_rank: u8 = if self.white_to_move {5} else {2}; // zero-based rank
-                    let taken_pawn_file = to_file;
+                if mv.from_square.file != mv.to_square.file && // If pawn captured
+                    self.squares[mv.to_square.index() as usize].is_none() // and the square at which
+                                                                          // it captured is empty
+                {
 
-                    let taken_pawn_index = indexing::index_from_position(taken_pawn_rank, taken_pawn_file).unwrap();
+                    let taken_pawn_square = Square {
+                        file: mv.to_square.file,
+                        rank: if self.white_to_move {Rank::Five} else {Rank::Four}
+                    };
 
-                    self.squares[mv.to_square as usize] =
-                        if self.white_to_move {Square::White(Piece::Pawn)}
-                        else {Square::Black(Piece::Pawn)};
+                    self.squares[mv.to_square.index() as usize] = Some(Piece {
+                        kind: PieceType::Pawn,
+                        white: self.white_to_move,
+                    });
 
-                    self.squares[mv.from_square as usize] = Square::Empty;
-                    self.squares[taken_pawn_index as usize] = Square::Empty;
+                    self.squares[mv.from_square.index() as usize] = None;
+                    self.squares[taken_pawn_square.index() as usize] = None;
                     self.white_to_move = !self.white_to_move;
                     return Ok(());
                 }
 
 
                 // Promotion
-                else if (self.white_to_move && from_rank == 6) ||
-                    (!self.white_to_move && from_rank == 1) {
+                else if (self.white_to_move && mv.from_square.rank == Rank::Seven) ||
+                       (!self.white_to_move && mv.from_square.rank == Rank::Two) {
 
                     match &mv.promotion {
-                        None => return Err(Error::InvalidMove), // invalid promotion
+                        None => return Err(()), // invalid promotion
                         Some(promotion) => {
-                            self.squares[mv.from_square as usize] = Square::Empty;
-                            self.squares[mv.to_square as usize] = promotion.to_square(self.white_to_move);
+
+                            self.squares[mv.from_square.index() as usize] = None;
+
+                            self.squares[mv.to_square.index() as usize] = Some(Piece {
+                                kind: promotion.to_piece_type(),
+                                white: self.white_to_move,
+                            });
+
                             self.white_to_move = !self.white_to_move;
                             return Ok(());
                         }
                     }
                 }
             },
-            Piece::King => {
+            PieceType::King => {
                 // Castling
-                if from_file == 4 && (to_file == 2 || to_file == 6) {
+                if mv.from_square.file == File::E && 
+                (mv.to_square.file == File::C || mv.to_square.file == File::G) {
 
-                    let rook_from_file: u8;
-                    let rook_to_file: u8;
-                    if to_file == 2 {
-                        rook_from_file = 0; // rook from a1
-                        rook_to_file = 3; // to d1
+                    let rook_from_file: File;
+                    let rook_to_file: File;
+
+                    if mv.to_square.file == File::C {
+                        rook_from_file = File::A;
+                        rook_to_file = File::D;
                     }
-                    else if to_file == 6 {
-                        rook_from_file = 7; // rook from a1
-                        rook_to_file = 5; // to f1
+                    else if mv.to_square.file == File::G {
+                        rook_from_file = File::H;
+                        rook_to_file = File::F;
                     }
                     else {panic!()}
 
-                    let rook_from_rank = from_rank; // rook is on the same rank as king when castling
+                    let rook_from_rank = mv.from_square.rank; // rook is on the same rank as king when castling
                     let rook_to_rank = rook_from_rank;
 
-                    let rook_from_index = indexing::index_from_position(rook_from_rank, rook_from_file).unwrap();
-                    let rook_to_index = indexing::index_from_position(rook_to_rank, rook_to_file).unwrap();
+                    let rook_from_square = Square {
+                        file: rook_from_file,
+                        rank: rook_from_rank,
+                    };
 
+                    let rook_to_square = Square {
+                        file: rook_to_file,
+                        rank: rook_to_rank,
+                    };
                     
                     // Remove king from original position
-                    self.squares[mv.from_square as usize] = Square::Empty;
+                    self.squares[mv.from_square.index() as usize] = None;
 
                     // Remove rook from original position
-                    self.squares[rook_from_index as usize] = Square::Empty;
+                    self.squares[rook_from_square.index() as usize] = None;
 
                     // Place rook at new position
-                    self.squares[rook_to_index as usize] = 
-                        if self.white_to_move {Square::White(Piece::Rook)}
-                        else {Square::Black(Piece::Rook)};
+                    self.squares[rook_to_square.index() as usize] = Some(Piece {
+                        kind: PieceType::Rook,
+                        white: self.white_to_move,
+                    });
 
                     // Place king at new position
-                    self.squares[mv.to_square as usize] = from_square;
+                    self.squares[mv.to_square.index() as usize] = Some(Piece {
+                        kind: PieceType::King,
+                        white: self.white_to_move,
+                    });
 
                     self.white_to_move = !self.white_to_move;
                     return Ok(());
@@ -154,8 +185,8 @@ impl Board {
         }
 
         // Base case
-        self.squares[mv.from_square as usize] = Square::Empty;
-        self.squares[mv.to_square as usize] = from_square;
+        self.squares[mv.to_square.index() as usize] = self.squares[mv.from_square.index() as usize];
+        self.squares[mv.from_square.index() as usize] = None;
         self.white_to_move = !self.white_to_move;
 
         Ok(())
@@ -169,7 +200,11 @@ impl Serializable for Board {
         let mut result = Vec::with_capacity(Self::size_in_memory());
 
         for square in &self.squares {
-            result.extend(square.serialize());
+            let serialized_square = match square {
+                None => vec![0],
+                Some(piece) => piece.serialize(),
+            };
+            result.extend(serialized_square);
         }
 
         result.push(u8::from(self.white_to_move));
@@ -177,19 +212,22 @@ impl Serializable for Board {
         return result;
     }
 
-    fn deserialize(bytes: &[u8]) -> Result<Self, Error> {
+    fn deserialize(bytes: &[u8]) -> Result<Self, ()> {
         if bytes.len() != Self::size_in_memory() {
-            return Err(Error::DeserializationError);
+            return Err(());
         }
 
-        let mut squares: [Square; 64] =
-            [const { Square::Empty }; 64];
+        let mut squares: [Option<Piece>; 64] = [None; 64];
 
         for (i, byte) in bytes[..64].iter().enumerate() {
-            squares[i] = Square::from_char(*byte)?;
+            // squares[i] = Square::from_char(*byte)?;
+            squares[i] = match byte {
+                0 => None,
+                other => Some(Piece::from_ascii(*other)?),
+            }
         }
 
-        let white_to_move = bool::try_from(bytes[64]).map_err(|_| Error::DeserializationError)?; 
+        let white_to_move = bool::try_from(bytes[64]).map_err(|_| ())?; 
 
         Ok(Board {
             squares,
@@ -198,3 +236,107 @@ impl Serializable for Board {
     }
     fn size_in_memory() -> usize {65}
 }
+
+
+
+
+
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn square(file: File, rank: Rank) -> Square {
+        Square { file, rank }
+    }
+
+    #[test]
+    fn parses_starting_position_and_side_to_move() {
+        let board = Board::parse_fen(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+        )
+        .unwrap();
+
+        assert!(board.white_to_move);
+        assert_eq!(
+            board.squares[square(File::E, Rank::One).index() as usize]
+                .unwrap()
+                .kind,
+            PieceType::King
+        );
+        assert_eq!(
+            board.squares[square(File::E, Rank::Eight).index() as usize]
+                .unwrap()
+                .kind,
+            PieceType::King
+        );
+    }
+
+    #[test]
+    fn parses_black_to_move() {
+        let board = Board::parse_fen("8/8/8/8/8/8/8/8 b - - 0 1").unwrap();
+        assert!(!board.white_to_move);
+    }
+
+    #[test]
+    fn rejects_invalid_side_to_move() {
+        assert!(Board::parse_fen("8/8/8/8/8/8/8/8 x - - 0 1").is_err());
+    }
+
+    #[test]
+    fn rejects_rank_with_too_many_squares() {
+        assert!(Board::parse_fen("9/8/8/8/8/8/8/8 w - - 0 1").is_err());
+    }
+
+    #[test]
+    fn applies_basic_pawn_move_and_changes_turn() {
+        let mut board = Board::parse_fen(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+        )
+        .unwrap();
+
+        let mv = Move {
+            from_square: square(File::E, Rank::Two),
+            to_square: square(File::E, Rank::Four),
+            promotion: None,
+        };
+
+        board.apply_move(&mv).unwrap();
+
+        assert!(board.squares[square(File::E, Rank::Two).index() as usize].is_none());
+        assert_eq!(
+            board.squares[square(File::E, Rank::Four).index() as usize]
+                .unwrap()
+                .kind,
+            PieceType::Pawn
+        );
+        assert!(!board.white_to_move);
+    }
+
+    #[test]
+    fn en_passant_removes_the_captured_pawn() {
+        let mut board =
+            Board::parse_fen("8/8/8/3pP3/8/8/8/8 w - - 0 1").unwrap();
+
+        let mv = Move {
+            from_square: square(File::E, Rank::Five),
+            to_square: square(File::D, Rank::Six),
+            promotion: None,
+        };
+
+        board.apply_move(&mv).unwrap();
+
+        assert!(board.squares[square(File::D, Rank::Five).index() as usize].is_none());
+        assert!(board.squares[square(File::E, Rank::Five).index() as usize].is_none());
+        assert_eq!(
+            board.squares[square(File::D, Rank::Six).index() as usize]
+                .unwrap()
+                .kind,
+            PieceType::Pawn
+        );
+    }
+}
+

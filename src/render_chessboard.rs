@@ -3,10 +3,7 @@ use image::{RgbaImage, Rgba, ImageBuffer};
 use ab_glyph::{FontRef, PxScale};
 use imageproc::drawing::draw_text_mut;
 
-use crate::Board;
-use crate::Square;
-use crate::Piece;
-use crate::indexing::*;
+use crate::{Board, Square, Piece, PieceType, Coordinate};
 
 const WP: &[u8] = include_bytes!("../assets/chess-pieces/150x150/wp-150x150.png");
 const WN: &[u8] = include_bytes!("../assets/chess-pieces/150x150/wn-150x150.png");
@@ -22,25 +19,21 @@ const BR: &[u8] = include_bytes!("../assets/chess-pieces/150x150/br-150x150.png"
 const BQ: &[u8] = include_bytes!("../assets/chess-pieces/150x150/bq-150x150.png");
 const BK: &[u8] = include_bytes!("../assets/chess-pieces/150x150/bk-150x150.png");
 
-fn square_to_image(square: &Square) -> Option<&[u8]> {
-    match square {
-        Square::Empty => None,
-        Square::White(piece) => Some(match piece {
-            Piece::Pawn => WP,
-            Piece::Knight => WN,
-            Piece::Bishop => WB,
-            Piece::Rook => WR,
-            Piece::Queen => WQ,
-            Piece::King => WK,
-        }),
-        Square::Black(piece) => Some(match piece {
-            Piece::Pawn => BP,
-            Piece::Knight => BN,
-            Piece::Bishop => BB,
-            Piece::Rook => BR,
-            Piece::Queen => BQ,
-            Piece::King => BK,
-        }),
+fn piece_to_image(piece: &Piece) -> &[u8] {
+    match (piece.white, piece.kind) {
+        (true, PieceType::Pawn) => WP,
+        (true, PieceType::Knight) => WN,
+        (true, PieceType::Bishop) => WB,
+        (true, PieceType::Rook) => WR,
+        (true, PieceType::Queen) => WQ,
+        (true, PieceType::King) => WK,
+
+        (false, PieceType::Pawn) => BP,
+        (false, PieceType::Knight) => BN,
+        (false, PieceType::Bishop) => BB,
+        (false, PieceType::Rook) => BR,
+        (false, PieceType::Queen) => BQ,
+        (false, PieceType::King) => BK,
     }
 }
 
@@ -72,14 +65,12 @@ fn fill_square(
     image: &mut RgbaImage,
     white_to_play: bool,
     square_index: u8,
-    square: &Square) -> Result<(), Box<dyn std::error::Error>>  {
+    piece: &Piece) -> Result<(), Box<dyn std::error::Error>>  {
 
     assert!(square_index < 64);
-    let piece_bytes = square_to_image(square);
+    let piece_bytes = piece_to_image(piece);
 
-    if piece_bytes.is_none() {return Ok(());}
-
-    let piece = image::load_from_memory(piece_bytes.unwrap())?.to_rgba8();
+    let piece = image::load_from_memory(piece_bytes)?.to_rgba8();
 
     let (size, _) = image.dimensions();
 
@@ -91,14 +82,14 @@ fn fill_square(
         image::imageops::FilterType::Lanczos3,
     );
 
-    let (rank, file) = position_from_index(square_index).unwrap();
+    let square = Square::try_from(square_index).unwrap();
 
-    let mut x = file;
-    let mut y = invert_coordinate(rank).unwrap();
+    let mut x = square.file;
+    let mut y = square.rank.inverted();
 
     if !white_to_play {
-        x = invert_coordinate(x).unwrap();
-        y = invert_coordinate(y).unwrap();
+        x = x.inverted();
+        y = y.inverted();
     }
 
     let x = x as u32 * square_size;
@@ -171,7 +162,9 @@ pub fn render_chessboard(board: &Board, style: BoardStyle) -> Result<Vec<u8>, Bo
 
 
     for (i, square) in board.squares.iter().enumerate() {
-        fill_square(&mut image, board.white_to_move, i as u8, square)?;
+        if let Some(piece) = square {
+            fill_square(&mut image, board.white_to_move, i as u8, piece)?;
+        }
     }
 
     let mut bytes = Vec::new();
