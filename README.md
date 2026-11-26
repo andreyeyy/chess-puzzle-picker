@@ -34,14 +34,12 @@ fn main() {
 ## Getting a random puzzle
 ```rust
 use std::path::Path;
-use chess_puzzle_picker::RatingRange;
 use chess_puzzle_picker::PuzzleDatabase;
 
 fn main() {
     let path_to_db = Path::new("/path/to/db.bin");
-    let rating_range = RatingRange::new(1700, 2200);
 
-    let puzzle = PuzzleDatabase::get_random_puzzle(&path_to_db, rating_range).unwrap();
+    let puzzle = PuzzleDatabase::get_random_puzzle(&path_to_db, 1700, 200_000).unwrap();
 }
 ```
 
@@ -51,15 +49,13 @@ This requires the "image" feature to be enabled
 use std::path::Path;
 use std::io::Write;
 
-use chess_puzzle_picker::RatingRange;
 use chess_puzzle_picker::PuzzleDatabase;
 use chess_puzzle_picker::render_chessboard::*;
 
 fn main() {
     let path_to_db = Path::new("/path/to/db.bin");
 
-    let rating_range = RatingRange::new(1700, 2200);
-    let puzzle = PuzzleDatabase::get_random_puzzle(path_to_db, rating_range).unwrap();
+    let puzzle = PuzzleDatabase::get_random_puzzle(path_to_db, 1700, 200_000).unwrap();
 
     let style = BoardStyle::default();
     let bytes = render_chessboard(&puzzle.board, style).unwrap();
@@ -68,5 +64,7 @@ fn main() {
     file.write_all(&bytes).unwrap();
 }
 ```
+
+
 
 
