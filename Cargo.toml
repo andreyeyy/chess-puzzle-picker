@@ -1,6 +1,6 @@
 [package]
 name = "chess-puzzle-picker"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 description = "Crate for efficient access to chess puzzles from the lichess puzzle database."
 license = "MIT"
