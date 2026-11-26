@@ -42,7 +42,7 @@
 //!
 //! fn main() {
 //!     let path_to_db = Path::new("/path/to/db.bin");
-//!     let rating_range = RatingRange::new(1700, 2200);
+//!     let rating_range = RatingRange::new(1700, 2200).unwrap();
 //!
 //!     let puzzle = PuzzleDatabase::get_random_puzzle(&path_to_db, rating_range).unwrap();
 //! }
@@ -61,7 +61,7 @@
 //! fn main() {
 //!     let path_to_db = Path::new("/path/to/db.bin");
 //!
-//!     let rating_range = RatingRange::new(1700, 2200);
+//!     let rating_range = RatingRange::new(1700, 2200).unwrap();
 //!     let puzzle = PuzzleDatabase::get_random_puzzle(path_to_db, rating_range).unwrap();
 //!
 //!     let style = BoardStyle::default();

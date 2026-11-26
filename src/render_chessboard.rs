@@ -1,7 +1,7 @@
 use std::io::Cursor;
 use image::{RgbaImage, Rgba, ImageBuffer};
 use ab_glyph::{FontRef, PxScale};
-use imageproc::drawing::draw_text_mut;
+use imageproc::drawing::{draw_text_mut, text_size};
 
 use crate::{Board, Square, Piece, PieceType, Coordinate};
 
@@ -50,7 +50,7 @@ impl Default for BoardStyle {
             size: 1024,
             color_white: Rgba([235, 235, 208, 255]),
             color_black: Rgba([115, 150, 82, 255]),
-            font_size: 0.04,
+            font_size: 0.035,
         }
     }
 }
@@ -104,6 +104,8 @@ pub fn render_chessboard(board: &Board, style: BoardStyle) -> Result<Vec<u8>, Bo
 
     let font = FontRef::try_from_slice(include_bytes!("../assets/Roboto-SemiBold.ttf"))?;
 
+    let margin: i32 = (style.size as f64 * 0.003) as i32;
+
     let mut image = ImageBuffer::from_fn(style.size, style.size, |x, y| {
         if (8*x/style.size + 8*y/style.size) % 2 == 0{
             style.color_white
@@ -111,11 +113,17 @@ pub fn render_chessboard(board: &Board, style: BoardStyle) -> Result<Vec<u8>, Bo
         else {style.color_black}
     });
 
+    let letter_y = style.size as f64 as i32 - style.font_size_px() as i32;
+
     let mut letter = 
     if board.white_to_move {b'a'} else {b'h'};
     for file in 0..8 {
-        let x = ((style.size as f64 * 0.09) + file as f64 * style.square_size() as f64) as i32;
-        let y = (style.size as f64 * 0.955) as i32;
+        let text = String::from(letter as char);
+
+        let (text_width, _text_height) = text_size(style.font_size_px(), &font, &text);
+        let letter_x = ((file + 1) * style.square_size()) as i32
+            - margin
+            - text_width as i32;
 
         let color = 
         if file % 2 == 0 {
@@ -126,21 +134,22 @@ pub fn render_chessboard(board: &Board, style: BoardStyle) -> Result<Vec<u8>, Bo
         draw_text_mut(
             &mut image,
             color,
-            x, y,
+            letter_x, letter_y,
             PxScale::from(style.font_size_px()),
             &font,
-            &String::from(letter as char),
+            &text,
         );
         if board.white_to_move {letter += 1}
         else {letter -= 1}
     }
 
+    let number_x = margin;
+
     let mut number = 
     if !board.white_to_move {b'1'} else {b'8'};
     for rank in 0..8 {
 
-        let x = (style.size as f64 * 0.003) as i32;
-        let y = (rank as f64 * style.square_size() as f64) as i32;
+        let number_y = (rank as f64 * style.square_size() as f64) as i32;
 
         let color = 
         if rank % 2 == 1 {
@@ -151,7 +160,7 @@ pub fn render_chessboard(board: &Board, style: BoardStyle) -> Result<Vec<u8>, Bo
         draw_text_mut(
             &mut image,
             color,
-            x, y,
+            number_x, number_y,
             PxScale::from(style.font_size_px()),
             &font,
             &String::from(number as char),
